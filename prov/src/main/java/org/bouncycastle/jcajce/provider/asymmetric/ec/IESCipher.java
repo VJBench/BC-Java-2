@@ -24,9 +24,10 @@ import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.KeyEncoder;
 import org.bouncycastle.crypto.agreement.ECDHBasicAgreement;
 import org.bouncycastle.crypto.digests.SHA1Digest;
-import org.bouncycastle.crypto.engines.AESFastEngine;
+import org.bouncycastle.crypto.engines.AESEngine;
 import org.bouncycastle.crypto.engines.DESedeEngine;
 import org.bouncycastle.crypto.engines.IESEngine;
+import org.bouncycastle.crypto.engines.OldIESEngine;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
 import org.bouncycastle.crypto.generators.EphemeralKeyPairGenerator;
 import org.bouncycastle.crypto.generators.KDF2BytesGenerator;
@@ -107,10 +108,6 @@ public class IESCipher
 
     public byte[] engineGetIV()
     {
-        if (engineSpec != null)
-        {
-            return engineSpec.getNonce();
-        }
         return null;
     }
 
@@ -267,13 +264,7 @@ public class IESCipher
         // Use default parameters (including cipher key size) if none are specified
         if (engineSpec == null)
         {
-            byte[] nonce = null;
-            if (ivLength != 0 && opmode == Cipher.ENCRYPT_MODE)
-            {
-                nonce = new byte[ivLength];
-                random.nextBytes(nonce);
-            }
-            this.engineSpec = IESUtil.guessParameterSpec(engine.getCipher(), nonce);
+            this.engineSpec = IESUtil.guessParameterSpec(engine.getCipher());
         }
         else if (engineSpec instanceof IESParameterSpec)
         {
@@ -286,9 +277,16 @@ public class IESCipher
 
         byte[] nonce = this.engineSpec.getNonce();
 
-        if (ivLength != 0 && (nonce == null || nonce.length != ivLength))
+        if (nonce != null)
         {
-            throw new InvalidAlgorithmParameterException("NONCE in IES Parameters needs to be " + ivLength + " bytes long");
+            if (ivLength == 0)
+            {
+                throw new InvalidAlgorithmParameterException("NONCE present in IES Parameters when none required");
+            }
+            else if (nonce.length != ivLength)
+            {
+                throw new InvalidAlgorithmParameterException("NONCE in IES Parameters needs to be " + ivLength + " bytes long");
+            }
         }
 
         // Parse the recipient's key
@@ -353,7 +351,7 @@ public class IESCipher
         }
         catch (InvalidAlgorithmParameterException e)
         {
-            throw new IllegalArgumentException("cannot handle supplied parameter spec: " + e.getMessage());
+            throw new IllegalArgumentException("can't handle supplied parameter spec");
         }
 
     }
@@ -515,12 +513,38 @@ public class IESCipher
     static public class ECIESwithCipher
         extends IESCipher
     {
+        public ECIESwithCipher(BlockCipher cipher)
+        {
+            super(new IESEngine(new ECDHBasicAgreement(),
+                            new KDF2BytesGenerator(new SHA1Digest()),
+                            new HMac(new SHA1Digest()),
+                            new PaddedBufferedBlockCipher(cipher)));
+        }
+
         public ECIESwithCipher(BlockCipher cipher, int ivLength)
         {
             super(new IESEngine(new ECDHBasicAgreement(),
                             new KDF2BytesGenerator(new SHA1Digest()),
                             new HMac(new SHA1Digest()),
                             new PaddedBufferedBlockCipher(cipher)), ivLength);
+        }
+    }
+
+    static public class ECIESwithDESede
+        extends ECIESwithCipher
+    {
+        public ECIESwithDESede()
+        {
+            super(new DESedeEngine());
+        }
+    }
+
+    static public class ECIESwithAES
+        extends ECIESwithCipher
+    {
+        public ECIESwithAES()
+        {
+            super(new AESEngine());
         }
     }
 
@@ -538,7 +562,77 @@ public class IESCipher
     {
         public ECIESwithAESCBC()
         {
-            super(new CBCBlockCipher(new AESFastEngine()), 16);
+            super(new CBCBlockCipher(new AESEngine()), 16);
+        }
+    }
+
+    /**
+     * Backwards compatibility
+     */
+    static public class OldECIES
+        extends IESCipher
+    {
+        public OldECIES()
+        {
+            super(new OldIESEngine(new ECDHBasicAgreement(),
+                new KDF2BytesGenerator(new SHA1Digest()),
+                new HMac(new SHA1Digest())));
+        }
+    }
+
+    static public class OldECIESwithCipher
+        extends IESCipher
+    {
+        public OldECIESwithCipher(BlockCipher baseCipher)
+        {
+            super(new OldIESEngine(new ECDHBasicAgreement(),
+                new KDF2BytesGenerator(new SHA1Digest()),
+                new HMac(new SHA1Digest()),
+                new PaddedBufferedBlockCipher(baseCipher)));
+        }
+
+        public OldECIESwithCipher(BlockCipher baseCipher, int ivLength)
+        {
+            super(new OldIESEngine(new ECDHBasicAgreement(),
+                new KDF2BytesGenerator(new SHA1Digest()),
+                new HMac(new SHA1Digest()),
+                new PaddedBufferedBlockCipher(baseCipher)), ivLength);
+        }
+    }
+
+    static public class OldECIESwithDESede
+        extends OldECIESwithCipher
+    {
+        public OldECIESwithDESede()
+        {
+            super(new DESedeEngine());
+        }
+    }
+
+    static public class OldECIESwithAES
+        extends OldECIESwithCipher
+    {
+        public OldECIESwithAES()
+        {
+            super(new AESEngine());
+        }
+    }
+
+    static public class OldECIESwithDESedeCBC
+        extends OldECIESwithCipher
+    {
+        public OldECIESwithDESedeCBC()
+        {
+            super(new CBCBlockCipher(new DESedeEngine()), 8);
+        }
+    }
+
+    static public class OldECIESwithAESCBC
+        extends OldECIESwithCipher
+    {
+        public OldECIESwithAESCBC()
+        {
+            super(new CBCBlockCipher(new AESEngine()), 16);
         }
     }
 }

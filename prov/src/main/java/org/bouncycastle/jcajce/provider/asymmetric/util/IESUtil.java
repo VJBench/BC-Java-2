@@ -6,7 +6,7 @@ import org.bouncycastle.jce.spec.IESParameterSpec;
 
 public class IESUtil
 {
-    public static IESParameterSpec guessParameterSpec(BufferedBlockCipher iesBlockCipher, byte[] nonce)
+    public static IESParameterSpec guessParameterSpec(BufferedBlockCipher iesBlockCipher)
     {
         if (iesBlockCipher == null)
         {
@@ -21,18 +21,18 @@ public class IESUtil
                 underlyingCipher.getAlgorithmName().equals("RC5-32") ||
                 underlyingCipher.getAlgorithmName().equals("RC5-64"))
             {
-                return new IESParameterSpec(null, null, 64, 64, nonce);
+                return new IESParameterSpec(null, null, 64, 64);
             }
             else if (underlyingCipher.getAlgorithmName().equals("SKIPJACK"))
             {
-                return new IESParameterSpec(null, null, 80, 80, nonce);
+                return new IESParameterSpec(null, null, 80, 80);
             }
             else if (underlyingCipher.getAlgorithmName().equals("GOST28147"))
             {
-                return new IESParameterSpec(null, null, 256, 256, nonce);
+                return new IESParameterSpec(null, null, 256, 256);
             }
 
-            return new IESParameterSpec(null, null, 128, 128, nonce);
+            return new IESParameterSpec(null, null, 128, 128);
         }
     }
 }
